@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geolocalización en Tiempo Real - Aaron</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"> <!-- Font Awesome para iconos -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet"> <!-- Importar fuente Poppins -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" /> <!-- CSS de Leaflet -->
+    <style>
+        /* Estilos generales */
+        body {
+            background-color: #000; /* Fondo negro */
+            color: #f7f7f7; /* Texto claro */
+            font-family: 'Poppins', sans-serif; /* Fuente Poppins */
+            margin: 0; /* Sin márgenes */
+            padding: 0; /* Sin relleno */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1, h2 {
+            color: #007bff; /* Color azul para encabezados */
+            text-align: center; /* Centrar encabezados */
+        }
+        p {
+            color: #f7f7f7; /* Color blanco para párrafos */
+            text-align: center; /* Centrar párrafos */
+        }
+        .menu-button {
+            position: absolute;
+            top: 20px; /* Ajustar posición */
+            right: 20px; /* Ajustar posición */
+            background: #000; /* Fondo negro */
+            border: none;
+            border-radius: 50%; /* Botón redondo */
+            color: white; /* Texto blanco */
+            padding: 10px; /* Relleno reducido para botón más pequeño */
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(255, 255, 255, 0.2); /* Sombra */
+            font-size: 20px; /* Tamaño del icono */
+            transition: background 0.3s, transform 0.3s; /* Transición suave */
+        }
+        .menu-button:hover {
+            background: #444; /* Fondo más oscuro al pasar el ratón */
+            transform: scale(1.1); /* Efecto de escala al pasar el ratón */
+        }
+        .overlay {
+            display: none; /* Ocultar por defecto */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85); /* Fondo oscuro con opacidad */
+            backdrop-filter: blur(5px); /* Desenfoque de fondo */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000; /* Overlay por encima del mapa */
+        }
+        .overlay.active {
+            display: flex; /* Mostrar cuando esté activo */
+        }
+        .menu {
+            background: rgba(255, 255, 255, 0.1); /* Fondo semi-transparente */
+            color: #f7f7f7; /* Texto claro */
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            z-index: 1001; /* Menú por encima del overlay */
+            max-width: 400px; /* Ancho máximo del menú */
+            width: 90%; /* Ancho del menú */
+            margin: auto; /* Centrar el menú */
+            animation: slideIn 0.5s ease; /* Animación al abrir el menú */
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        button {
+            background-color: #007bff; /* Fondo azul para botones */
+            color: #fff; /* Texto blanco en botones */
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px 0; /* Espaciado entre botones */
+            transition: background 0.3s, transform 0.2s; /* Transición suave */
+            width: 100%; /* Botones de ancho completo */
+        }
+        button:hover {
+            background-color: darkblue; /* Color más oscuro al pasar el ratón */
+            transform: translateY(-2px); /* Efecto de elevación al pasar el ratón */
+        }
+        input {
+            margin-bottom: 10px; /* Espaciado entre inputs */
+            padding: 10px; /* Relleno para inputs */
+            border-radius: 5px; /* Bordes redondeados para inputs */
+            border: 1px solid #ccc; /* Borde suave */
+            width: 100%; /* Ancho completo para inputs */
+            box-sizing: border-box; /* Incluir relleno y borde en el ancho total */
+        }
+        #map {
+            height: 500px;
+            width: 100%; /* Asegura que el mapa use el ancho completo */
+            border-radius: 20px; /* Bordes redondeados para el mapa */
+            overflow: hidden; /* Asegura que el mapa no sobresalga de los bordes */
+            margin-top: 20px; /* Espaciado superior */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); /* Sombra para el mapa */
+        }
+        .alert-box {
+            display: none; /* Ocultar por defecto */
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9); /* Fondo negro */
+            color: #f7f7f7; /* Texto claro */
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            z-index: 1002; /* Por encima del menú */
+            text-align: center; /* Centrar texto */
+        }
+        .alert-box button {
+            background-color: #007bff; /* Fondo azul para el botón del cuadro de alerta */
+            margin-top: 10px; /* Espaciado superior */
+        }
+        footer {
+            text-align: center; /* Centrar texto del pie de página */
+            padding: 20px 0; /* Relleno superior e inferior */
+            color: #f7f7f7; /* Color claro para el pie de página */
+        }
+        .login-warning {
+            background-color: #000; /* Fondo negro para la advertencia */
+            color: #f7f7f7; /* Texto claro */
+            padding: 10px; /* Relleno para la advertencia */
+            border-radius: 5px; /* Bordes redondeados */
+            margin-top: 10px; /* Espaciado superior */
+            display: none; /* Ocultar por defecto */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Geolocalización en Tiempo Real - Aaron</h1>
+        <button class="menu-button" id="menu-button">⋮</button>
+
+        <section>
+            <h2>Descripción</h2>
+            <p>Esta aplicación permite localizar una IP en el mapa en tiempo real. Ingresa una IP para ver su ubicación.</p>
+        </section>
+
+        <section>
+            <h2>Buscar IP</h2>
+            <div class="form-group">
+                <label for="ip-input">Ingresa la IP:</label>
+                <input type="text" id="ip-input" placeholder="Ej. 8.8.8.8">
+                <button id="search-button">Buscar</button>
+                <p id="location-count"></p>
+                <div id="login-warning" class="login-warning">Necesitas iniciar sesión para realizar más de 3 geolocalizaciones.</div>
+            </div>
+        </section>
+
+        <section id="profile" style="display: none;">
+            <h2>Perfil de Usuario</h2>
+            <p id="profile-info"></p>
+        </section>
+
+        <div id="map"></div> <!-- Mapa de Leaflet -->
+
+        <div class="overlay" id="overlay">
+            <div class="menu" id="menu">
+                <button class="back-button" id="back-button">←</button>
+                <h2>Menú</h2>
+                <div id="login-form">
+                    <input type="email" id="email" placeholder="Correo Electrónico">
+                    <input type="password" id="password" placeholder="Contraseña">
+                    <button id="login-button">Iniciar Sesión</button>
+                    <i class="fas fa-spinner fa-spin loading" id="login-loading" style="display:none;"></i> <!-- Icono de carga -->
+                    <p id="login-message" class="error-message"></p>
+                    <p id="success-login" class="success-message" style="display:none;">Inicio exitoso! <i class="fas fa-check-circle success-icon"></i></p>
+                    <button id="forgot-password-button" class="button-separator">Olvidé mi contraseña</button>
+                    <button id="register-button" class="button-separator">Registrarse</button>
+                </div>
+
+                <div id="register-form" style="display:none;">
+                    <h2>Registrarse</h2>
+                    <input type="text" id="new-username" placeholder="Nuevo Usuario">
+                    <input type="password" id="new-password" placeholder="Nueva Contraseña">
+                    <input type="email" id="new-email" placeholder="Correo Electrónico">
+                    <button id="submit-register-button">Registrarse</button>
+                    <i class="fas fa-spinner fa-spin loading" id="register-loading" style="display:none;"></i> <!-- Icono de carga -->
+                    <p id="register-message" class="success-message" style="display:none;"></p>
+                    <p id="register-error" class="error-message" style="display:none;"></p>
+                    <button id="back-to-login-button" class="button-separator spaced-button">Volver a Iniciar Sesión</button>
+                </div>
+
+                <div id="recover-password-section" style="display:none;">
+                    <h2>Recuperar Contraseña</h2>
+                    <input type="email" id="recover-email" placeholder="Ingresa tu correo electrónico">
+                    <button id="send-code-button">Enviar Código</button>
+                    <p id="recover-message" class="success-message"></p>
+                    <button id="back-to-login-from-recover" class="button-separator spaced-button">Volver al inicio de sesión</button>
+                </div>
+
+                <div id="reset-password-section" style="display:none;">
+                    <h2>Restablecer Contraseña</h2>
+                    <input type="text" id="verification-code" placeholder="Ingresa el código">
+                    <input type="password" id="new-password-reset" placeholder="Nueva Contraseña">
+                    <button id="confirm-reset-button">Restablecer Contraseña</button>
+                    <p id="reset-message" class="success-message"></p>
+                    <button id="back-to-recover-button" class="button-separator spaced-button">Volver a recuperar contraseña</button>
+                </div>
+
+                <button id="logout-button" style="display: none;">Cerrar Sesión</button> <!-- Botón de cerrar sesión -->
+                <button id="close-menu">Cerrar</button>
+            </div>
+        </div>
+
+        <div class="alert-box" id="alert-box">
+            <p>Has alcanzado el límite de geolocalizaciones. Por favor, inicia sesión para continuar.</p>
+            <button id="alert-login-button">Iniciar Sesión</button>
+        </div>
+
+        <footer>
+            <p>© 2024 Geolocalización en Tiempo Real</p>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script> <!-- JS de Leaflet -->
+    <script>
+        let isLoggedIn = false; // Estado de inicio de sesión
+        const maxLocations = 3; // Máximo de localizaciones gratis
+        let locationCount = parseInt(localStorage.getItem('locationCount')) || 0; // Recuperar el conteo de localizaciones
+        let alertShown = false; // Para controlar si se ha mostrado el cuadro de alerta
+
+        // Inicializar mapa
+        var map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var marker = L.marker([0, 0]).addTo(map);
+
+        // Comprobar el estado de inicio de sesión al cargar la página
+        window.onload = function () {
+            const savedUser = localStorage.getItem('loggedUser');
+            if (savedUser) {
+                const userData = JSON.parse(savedUser);
+                isLoggedIn = true;
+                document.getElementById('profile-info').textContent = `Bienvenido, ${userData.username}!`;
+                document.getElementById('profile').style.display = 'block'; // Mostrar perfil
+                document.getElementById('logout-button').style.display = 'block'; // Mostrar botón de cerrar sesión
+                document.getElementById('login-form').style.display = 'none'; // Ocultar formulario de inicio de sesión
+            }
+
+            // Mostrar el conteo actual de localizaciones
+            document.getElementById('location-count').textContent = `Localizaciones realizadas: ${locationCount}/${maxLocations}`;
+        };
+
+        // Funciones para mostrar y ocultar el menú
+        document.getElementById('menu-button').addEventListener('click', function () {
+            document.getElementById('overlay').classList.add('active');
+            document.getElementById('menu').style.display = 'block';
+        });
+
+        document.getElementById('close-menu').addEventListener('click', function () {
+            document.getElementById('overlay').classList.remove('active');
+            document.getElementById('menu').style.display = 'none';
+        });
+
+        // Botón de retroceso
+        document.getElementById('back-button').addEventListener('click', function () {
+            document.getElementById('menu').style.display = 'none'; // Oculta el menú
+            document.getElementById('overlay').classList.remove('active'); // Cierra el overlay
+        });
+
+        // Inicio de sesión
+        document.getElementById('login-button').addEventListener('click', function () {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            document.getElementById('login-loading').style.display = 'inline-block'; // Mostrar icono de carga
+            document.getElementById('login-message').textContent = ""; // Limpiar mensaje de error
+            document.getElementById('success-login').style.display = 'none'; // Ocultar mensaje de éxito
+
+            const userData = JSON.parse(localStorage.getItem(email));
+            setTimeout(() => { // Simular tiempo de carga
+                if (userData && userData.password === password) {
+                    isLoggedIn = true;
+                    document.getElementById('profile-info').textContent = `Bienvenido, ${userData.username}!`;
+                    document.getElementById('profile').style.display = 'block';
+                    document.getElementById('login-loading').style.display = 'none'; // Ocultar icono de carga
+                    document.getElementById('success-login').style.display = 'block'; // Mostrar mensaje de éxito
+                    document.getElementById('menu').style.display = 'none';
+                    document.getElementById('overlay').classList.remove('active');
+                    document.getElementById('logout-button').style.display = 'block'; // Mostrar botón de cerrar sesión
+
+                    // Guardar el estado del usuario en localStorage
+                    localStorage.setItem('loggedUser', JSON.stringify(userData));
+                } else {
+                    document.getElementById('login-message').textContent = "Correo o contraseña incorrectos.";
+                    document.getElementById('login-loading').style.display = 'none'; // Ocultar icono de carga
+                }
+            }, 1000); // Simulación de carga de 1 segundo
+        });
+
+        // Cerrar sesión
+        document.getElementById('logout-button').addEventListener('click', function () {
+            isLoggedIn = false;
+            document.getElementById('profile').style.display = 'none';
+            localStorage.removeItem('loggedUser'); // Eliminar el estado de inicio de sesión
+            document.getElementById('logout-button').style.display = 'none'; // Ocultar botón de cerrar sesión
+            document.getElementById('login-form').style.display = 'block'; // Mostrar formulario de inicio de sesión
+            document.getElementById('success-login').style.display = 'none'; // Ocultar mensaje de éxito
+        });
+
+        // Registro de usuario
+        document.getElementById('register-button').addEventListener('click', function () {
+            document.getElementById('login-form').style.display = 'none'; // Ocultar formulario de inicio de sesión
+            document.getElementById('register-form').style.display = 'block'; // Mostrar formulario de registro
+        });
+
+        document.getElementById('submit-register-button').addEventListener('click', function () {
+            const newUsername = document.getElementById('new-username').value.trim();
+            const newPassword = document.getElementById('new-password').value;
+            const newEmail = document.getElementById('new-email').value.trim();
+            document.getElementById('register-loading').style.display = 'inline-block'; // Mostrar icono de carga
+            document.getElementById('register-message').textContent = ""; // Limpiar mensaje de éxito
+            document.getElementById('register-error').textContent = ""; // Limpiar mensaje de error
+
+            if (newUsername === "" || newPassword === "" || newEmail === "") {
+                document.getElementById('register-error').textContent = "Por favor, completa todos los campos.";
+                document.getElementById('register-loading').style.display = 'none'; // Ocultar icono de carga
+                return;
+            }
+
+            setTimeout(() => { // Simular tiempo de carga
+                if (localStorage.getItem(newEmail)) {
+                    document.getElementById('register-error').textContent = "El correo ya está registrado.";
+                    document.getElementById('register-loading').style.display = 'none'; // Ocultar icono de carga
+                } else {
+                    const userData = { username: newUsername, password: newPassword };
+                    localStorage.setItem(newEmail, JSON.stringify(userData));
+                    document.getElementById('register-message').textContent = "Usuario registrado exitosamente!";
+                    document.getElementById('register-loading').style.display = 'none'; // Ocultar icono de carga
+                    document.getElementById('register-form').style.display = 'none';
+                    document.getElementById('login-form').style.display = 'block'; // Volver a mostrar formulario de inicio de sesión
+                }
+            }, 1000); // Simulación de carga de 1 segundo
+        });
+
+        // Volver a iniciar sesión desde el registro
+        document.getElementById('back-to-login-button').addEventListener('click', function () {
+            document.getElementById('register-form').style.display = 'none'; // Ocultar formulario de registro
+            document.getElementById('login-form').style.display = 'block'; // Mostrar formulario de inicio de sesión
+        });
+
+        // Recuperar contraseña
+        document.getElementById('forgot-password-button').addEventListener('click', function () {
+            document.getElementById('login-form').style.display = 'none'; // Ocultar formulario de inicio de sesión
+            document.getElementById('recover-password-section').style.display = 'block'; // Mostrar sección de recuperación de contraseña
+        });
+
+        document.getElementById('back-to-login-from-recover').addEventListener('click', function () {
+            document.getElementById('recover-password-section').style.display = 'none'; // Ocultar sección de recuperación de contraseña
+            document.getElementById('login-form').style.display = 'block'; // Mostrar formulario de inicio de sesión
+        });
+
+        document.getElementById('send-code-button').addEventListener('click', function () {
+            const recoverEmail = document.getElementById('recover-email').value.trim();
+            if (!recoverEmail) {
+                alert("Por favor, ingresa tu correo electrónico.");
+                return;
+            }
+
+            // Simulación de envío de código
+            setTimeout(() => {
+                alert("Código de recuperación enviado a " + recoverEmail);
+                document.getElementById('recover-message').textContent = "Código enviado. Revisa tu correo.";
+            }, 1000); // Simulación de carga de 1 segundo
+        });
+
+        // Buscar IP
+        document.getElementById('search-button').addEventListener('click', function () {
+            if (locationCount >= maxLocations && !isLoggedIn) {
+                if (!alertShown) { // Mostrar solo una vez
+                    document.getElementById('alert-box').style.display = 'block'; // Mostrar cuadro de alerta
+                    alertShown = true; // Marcar que se ha mostrado el cuadro
+                }
+                return;
+            }
+            document.getElementById('login-warning').style.display = 'none'; // Ocultar advertencia
+
+            var ip = document.getElementById('ip-input').value.trim();
+            if (!ip) {
+                alert("Por favor, ingresa una IP válida.");
+                return;
+            }
+
+            // Usando la API de ip-api.com
+            fetch(`http://ip-api.com/json/${ip}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "fail") {
+                        alert("No se pudo obtener la ubicación. Verifica la IP ingresada.");
+                    } else {
+                        // Actualizar el mapa con la ubicación
+                        const lat = data.lat;
+                        const lon = data.lon;
+                        const city = data.city || "Ciudad no disponible";
+                        const region = data.regionName || "Región no disponible";
+                        const isp = data.isp || "ISP no disponible";
+
+                        marker.setLatLng([lat, lon])
+                            .bindPopup(`Ciudad: ${city}<br>Región: ${region}<br>ISP: ${isp}<br>Latitud: ${lat}, Longitud: ${lon}`)
+                            .openPopup(); // Mostrar en el popup
+
+                        map.setView([lat, lon], 13); // Ajustar el zoom
+                        locationCount++; // Aumentar el conteo de localizaciones
+                        localStorage.setItem('locationCount', locationCount); // Guardar el conteo
+                        document.getElementById('location-count').textContent = `Localizaciones realizadas: ${locationCount}/${maxLocations}`;
+                    }
+                })
+                .catch(error => {
+                    console.error("Error al obtener los datos:", error);
+                });
+        });
+
+        // Manejo de botón de inicio de sesión en el cuadro de alerta
+        document.getElementById('alert-login-button').addEventListener('click', function () {
+            document.getElementById('alert-box').style.display = 'none'; // Ocultar cuadro de alerta
+            document.getElementById('overlay').classList.add('active'); // Mostrar overlay
+            document.getElementById('menu').style.display = 'block'; // Mostrar menú
+        });
+    </script>
+</body>
+
+</html>
