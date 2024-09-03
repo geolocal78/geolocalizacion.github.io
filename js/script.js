@@ -1,71 +1,45 @@
-let locationCount = 0; // Contador de localizaciones para usuarios no autenticados
-const maxLocations = 3; 
-const locationHistory = JSON.parse(localStorage.getItem('locationHistory')) || []; 
-const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers')) || []; 
-
-// Verificar estado de inicio de sesión y actualizar el contador
-function checkLoginStatus() {
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (loggedInUser) {
-        showNotification("Bienvenido de nuevo, " + loggedInUser + "!");
-        document.getElementById('logout-button').style.display = 'block'; 
-        document.getElementById('login-form').style.display = 'none'; 
-        document.getElementById('register-form').style.display = 'none'; 
-        document.getElementById('location-count').textContent = 'Localizaciones realizadas: Ilimitadas';
-    } else {
-        locationCount = parseInt(localStorage.getItem('locationCount')) || 0;
-        document.getElementById('location-count').textContent = `Localizaciones realizadas: ${locationCount}/${maxLocations}`;
-    }
-}
-
-// Inicializar el estado de inicio de sesión
-checkLoginStatus();
+let isLoggedIn = false; // Estado de inicio de sesión
+const maxLocations = 3; // Máximo de localizaciones gratis
+let locationCount = parseInt(localStorage.getItem('locationCount')) || 0; // Recuperar el conteo de localizaciones
+let alertShown = false; // Para controlar si se ha mostrado el cuadro de alerta
 
 // Inicializar mapa
-var map = L.map('map').setView([20, -100], 5); 
+var map = L.map('map').setView([20, 0], 2);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
-var marker = L.marker([20, -100]).addTo(map); 
+var marker = L.marker([0, 0]).addTo(map);
 
-// Actualizar el conteo de localizaciones
-function updateLocationCount() {
-    if (localStorage.getItem('loggedInUser')) {
-        document.getElementById('location-count').textContent = 'Localizaciones realizadas: Ilimitadas';
-    } else {
-        document.getElementById('location-count').textContent = `Localizaciones realizadas: ${locationCount}/${maxLocations}`;
+// Comprobar el estado de inicio de sesión al cargar la página
+window.onload = function () {
+    const savedUser = localStorage.getItem('loggedUser');
+    if (savedUser) {
+        const userData = JSON.parse(savedUser);
+        isLoggedIn = true;
+        document.getElementById('profile-info').textContent = `Bienvenido, ${userData.username}!`;
+        document.getElementById('profile').style.display = 'block'; // Mostrar perfil
+        document.getElementById('logout-button').style.display = 'block'; // Mostrar botón de cerrar sesión
+        document.getElementById('login-form').style.display = 'none'; // Ocultar formulario de inicio de sesión
     }
-}
 
-// Mostrar historial de geolocalizaciones
-function showLocationHistory() {
-    const historyDiv = document.createElement('div');
-    historyDiv.innerHTML = '<h2>Historial de Geolocalizaciones</h2>';
-    locationHistory.forEach(loc => {
-        const { lat, lon, ip } = loc;
-        const locItem = document.createElement('p');
-        locItem.textContent = `IP: ${ip} - Lat: ${lat}, Lon: ${lon}`;
-        historyDiv.appendChild(locItem);
-    });
-    document.body.appendChild(historyDiv);
-}
+    // Mostrar el conteo actual de localizaciones
+    document.getElementById('location-count').textContent = `Localizaciones realizadas: ${locationCount}/${maxLocations}`;
+};
 
 // Funcionalidad para buscar IP
 document.getElementById('search-button').addEventListener('click', function () {
     const ipInput = document.getElementById('ip-input').value.trim();
     if (!ipInput) {
-        showNotification('Por favor, ingresa una dirección IP.');
+        alert('Por favor, ingresa una dirección IP.');
         return;
     }
 
-    // Lógica para limitar geolocalizaciones
-    if (!localStorage.getItem('loggedInUser') && locationCount >= maxLocations) {
-        document.getElementById('alert-message').textContent = "Has alcanzado el límite de geolocalizaciones. Inicia sesión para continuar.";
-        document.getElementById('alert-box').style.display = 'block'; 
-        setTimeout(() => {
-            document.getElementById('alert-box').style.display = 'none'; 
-        }, 5000);
+    if (locationCount >= maxLocations && !isLoggedIn) {
+        if (!alertShown) {
+            document.getElementById('alert-box').style.display = 'block'; // Mostrar cuadro de alerta
+            alertShown = true;
+        }
         return;
     }
 
@@ -74,109 +48,49 @@ document.getElementById('search-button').addEventListener('click', function () {
         .then(response => response.json())
         .then(data => {
             if (data.status === "fail") {
-                showNotification('No se pudo encontrar la ubicación para esta IP.');
+                alert('No se pudo encontrar la ubicación para esta IP.');
             } else {
-                const { lat, lon, city, region, country, zip, isp } = data;
-                marker.setLatLng([lat, lon]);
-                map.setView([lat, lon], 10);
-                marker.bindPopup(`<b>IP: ${ipInput}</b><br>Ciudad: ${city}<br>Región: ${region}<br>País: ${country}<br>Código Postal: ${zip}<br>ISP: ${isp}`).openPopup();
+                const { lat, lon, city, region, country } = data;
+                marker.setLatLng([lat, lon]); // Actualizar la posición del marcador
+                map.setView([lat, lon], 10); // Centrar el mapa en la ubicación
+                marker.bindPopup(`<b>${city}, ${region}, ${country}</b>`).openPopup();
 
-                // Incrementar el contador de localizaciones solo si el usuario no ha iniciado sesión
-                if (!localStorage.getItem('loggedInUser')) {
-                    locationCount++;
-                    localStorage.setItem('locationCount', locationCount); // Guardar el contador de localizaciones
-                }
-                
-                updateLocationCount();
-
-                // Guardar en el historial
-                locationHistory.push({ lat, lon, ip: ipInput });
-                localStorage.setItem('locationHistory', JSON.stringify(locationHistory));
-
-                // Mostrar historial de geolocalizaciones
-                showLocationHistory();
+                // Incrementar el conteo de localizaciones
+                locationCount++;
+                localStorage.setItem('locationCount', locationCount);
+                document.getElementById('location-count').textContent = `Localizaciones realizadas: ${locationCount}/${maxLocations}`;
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showNotification('Hubo un error al obtener la geolocalización.');
+            alert('Hubo un error al obtener la geolocalización.');
         });
 });
 
-// Funciones para mostrar y ocultar el menú
+// Función para cerrar sesión
+document.getElementById('logout-button').addEventListener('click', function () {
+    isLoggedIn = false;
+    document.getElementById('profile').style.display = 'none';
+    localStorage.removeItem('loggedUser'); // Eliminar el estado de inicio de sesión
+    document.getElementById('logout-button').style.display = 'none'; // Ocultar botón de cerrar sesión
+    document.getElementById('login-form').style.display = 'block'; // Mostrar formulario de inicio de sesión
+});
+
+// Mostrar menú y manejar eventos
 document.getElementById('menu-button').addEventListener('click', function () {
-    document.getElementById('overlay').style.display = 'flex';
+    document.getElementById('overlay').classList.add('active');
+    document.getElementById('menu').style.display = 'block';
 });
 
+// Cerrar menú
 document.getElementById('close-menu').addEventListener('click', function () {
-    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('overlay').classList.remove('active');
+    document.getElementById('menu').style.display = 'none';
 });
 
-// Función para mostrar notificaciones
-function showNotification(message) {
-    const notification = document.getElementById('notification');
-    notification.textContent = message;
-    notification.style.display = 'block';
-    notification.style.opacity = 1;
-
-    setTimeout(() => {
-        notification.style.opacity = 0;
-        notification.style.display = 'none';
-    }, 3000); 
-}
-
-// Manejo del inicio de sesión
-document.getElementById('login-button').addEventListener('click', function () {
-    const email = document.getElementById('email-login').value;
-    const password = document.getElementById('password-login').value;
-
-    document.getElementById('login-message').style.opacity = 0;
-    document.querySelector('.loading-icon').style.display = 'inline-block';
-    document.getElementById('login-message').textContent = "";
-
-    if (email && password) {
-        const user = registeredUsers.find(user => user.email === email && user.password === password);
-        setTimeout(() => {
-            document.querySelector('.loading-icon').style.display = 'none';
-            if (user) {
-                localStorage.setItem('loggedInUser', user.email); 
-                showNotification("Inicio de sesión exitoso!");
-                localStorage.setItem('locationCount', 0); // Reiniciar el contador al iniciar sesión
-                updateLocationCount(); // Actualizar el contador de visualización
-                document.getElementById('overlay').style.display = 'none'; 
-                document.getElementById('alert-box').style.display = 'none'; 
-                document.getElementById('logout-button').style.display = 'block'; 
-                document.getElementById('login-form').style.display = 'none'; 
-                document.getElementById('register-form').style.display = 'none'; 
-            } else {
-                showNotification("Credenciales incorrectas.");
-            }
-        }, 2000); 
-    } else {
-        document.querySelector('.loading-icon').style.display = 'none';
-        document.getElementById('login-message').textContent = "Por favor, completa todos los campos.";
-        document.getElementById('login-message').style.opacity = 1;
-    }
-});
-
-// Manejo del registro
-document.getElementById('register-button').addEventListener('click', function () {
-    const name = document.getElementById('name').value;
-    const email = document.getElementById('email-register').value;
-    const password = document.getElementById('password-register').value;
-    const dob = document.getElementById('dob').value;
-
-    if (name && email && password && dob) {
-        const existingUser = registeredUsers.find(user => user.email === email);
-        if (existingUser) {
-            showNotification("Este correo ya está registrado.");
-        } else {
-            registeredUsers.push({ name, email, password, dob });
-            localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
-            showNotification("Registro exitoso. Puedes iniciar sesión ahora.");
-            document.getElementById('register-form').reset();
-        }
-    } else {
-        showNotification("Por favor, completa todos los campos.");
-    }
+// Manejar el botón de alerta para iniciar sesión
+document.getElementById('alert-login-button').addEventListener('click', function () {
+    document.getElementById('alert-box').style.display = 'none'; // Ocultar cuadro de alerta
+    document.getElementById('menu').style.display = 'block'; // Mostrar menú para iniciar sesión
+    document.getElementById('overlay').classList.add('active');
 });
