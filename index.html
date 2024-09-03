@@ -1,8 +1,3 @@
-Claro, gracias por la aclaración. Aquí tienes el código HTML que proporcionaste, con las modificaciones necesarias para que el botón de "Buscar IP" funcione correctamente. He hecho ajustes específicos sin eliminar líneas adicionales innecesarias.
-
-### Código HTML Modificado
-
-```html
 <!DOCTYPE html>
 <html lang="es">
 
@@ -371,7 +366,28 @@ Claro, gracias por la aclaración. Aquí tienes el código HTML que proporcionas
 
         document.getElementById('back-to-login-from-recover').addEventListener('click', function () {
             document.getElementById('recover-password-section').style.display = 'none'; // Ocultar sección de recuperación de contraseña
-            document.getElementById('login-form').style.display = 'block'; // Mostrar cuadro de alerta
+            document.getElementById('login-form').style.display = 'block'; // Mostrar formulario de inicio de sesión
+        });
+
+        document.getElementById('send-code-button').addEventListener('click', function () {
+            const recoverEmail = document.getElementById('recover-email').value.trim();
+            if (!recoverEmail) {
+                alert("Por favor, ingresa tu correo electrónico.");
+                return;
+            }
+
+            // Simulación de envío de código
+            setTimeout(() => {
+                alert("Código de recuperación enviado a " + recoverEmail);
+                document.getElementById('recover-message').textContent = "Código enviado. Revisa tu correo.";
+            }, 1000); // Simulación de carga de 1 segundo
+        });
+
+        // Buscar IP
+        document.getElementById('search-button').addEventListener('click', function () {
+            if (locationCount >= maxLocations && !isLoggedIn) {
+                if (!alertShown) { // Mostrar solo una vez
+                    document.getElementById('alert-box').style.display = 'block'; // Mostrar cuadro de alerta
                     alertShown = true; // Marcar que se ha mostrado el cuadro
                 }
                 return;
